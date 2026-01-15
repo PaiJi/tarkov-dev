@@ -310,8 +310,6 @@ function Player() {
         [setPlayerData, setProfileError, gameMode],
     );
 
-    const currentWipe = wipeDetails()[0];
-
     useEffect(() => {
         if (playerData.aid === 0) {
             setProfileImageLoaded(false);
@@ -402,384 +400,6 @@ function Player() {
         }
         return <p>{t("Last active: {{date}}", { date: new Date(latest * 1000).toLocaleString() })}</p>;
     }, [playerData, t]);
-
-    const achievementColumns = useMemo(
-        () => [
-            {
-                Header: t("Name"),
-                id: "name",
-                accessor: "name",
-                Cell: (props) => {
-                    let image = <></>;
-                    if (props.row.original.imageLink) {
-                        image = <img src={props.row.original.imageLink} alt="" className="table-image" />;
-                    }
-                    return (
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                            {image}
-                            <span>{props.value}</span>
-                        </div>
-                    );
-                },
-            },
-            {
-                Header: t("Description"),
-                id: "description",
-                accessor: "description",
-            },
-            {
-                Header: t("Player %"),
-                id: "playersCompletedPercent",
-                accessor: "adjustedPlayersCompletedPercent",
-                Cell: (props) => {
-                    return <div className="center-content">{props.value}%</div>;
-                },
-                sortType: "basic",
-            },
-            {
-                Header: t("Completed"),
-                id: "completionDate",
-                accessor: "completionDate",
-                Cell: (props) => {
-                    return (
-                        <div
-                            className={`center-content${new Date(props.value * 1000) > currentWipe.start ? " current-wipe-achievement" : ""}`}
-                        >
-                            {new Date(props.value * 1000).toLocaleString()}
-                        </div>
-                    );
-                },
-            },
-            {
-                Header: t("Rarity"),
-                id: "rarity",
-                accessor: "rarity",
-                Cell: (props) => {
-                    return <div className={`center-content ${props.row.original.normalizedRarity}`}>{props.value}</div>;
-                },
-                sortType: (rowA, rowB) => {
-                    let rowAr = raritySort[rowA.original.normalizedRarity];
-                    let rowBr = raritySort[rowB.original.normalizedRarity];
-                    if (rowAr === rowBr) {
-                        return rowB.original.playersCompletedPercent - rowA.original.playersCompletedPercent;
-                    }
-                    return rowAr - rowBr;
-                },
-            },
-        ],
-        [t, currentWipe],
-    );
-
-    const achievementsData = useMemo(() => {
-        return (
-            achievements
-                ?.map((a) => {
-                    if (!playerData.achievements[a.id]) {
-                        return false;
-                    }
-                    return {
-                        ...a,
-                        completionDate: playerData.achievements[a.id],
-                    };
-                })
-                .filter(Boolean) || []
-        );
-    }, [achievements, playerData]);
-
-    const raidsColumns = useMemo(
-        () => [
-            {
-                Header: t("Side"),
-                id: "side",
-                accessor: "side",
-                Cell: (props) => {
-                    return t(props.value);
-                },
-            },
-            {
-                Header: t("Raids"),
-                id: "raids",
-                accessor: "raids",
-            },
-            {
-                Header: t("Survived"),
-                id: "survived",
-                accessor: "survived",
-            },
-            {
-                Header: t("Runthrough"),
-                id: "runthrough",
-                accessor: "runthrough",
-                Cell: (props) => {
-                    return props.value;
-                },
-            },
-            {
-                Header: t("MIA"),
-                id: "mia",
-                accessor: "mia",
-                Cell: (props) => {
-                    return props.value;
-                },
-            },
-            {
-                Header: t("KIA"),
-                id: "kia",
-                accessor: "kia",
-                Cell: (props) => {
-                    return props.value;
-                },
-            },
-            {
-                Header: t("Kills"),
-                id: "kills",
-                accessor: "kills",
-                Cell: (props) => {
-                    return props.value;
-                },
-            },
-            {
-                Header: t("K:D", { nsSeparator: "|" }),
-                id: "kdr",
-                accessor: "kills",
-                Cell: (props) => {
-                    if (props.value === 0) {
-                        return "0";
-                    }
-                    return (props.value / props.row.original.kia).toFixed(2);
-                },
-            },
-            {
-                Header: t("Win Streak"),
-                id: "streak",
-                accessor: "streak",
-                Cell: (props) => {
-                    return props.value;
-                },
-            },
-        ],
-        [t],
-    );
-
-    const raidsData = useMemo(() => {
-        if (!playerData.pmcStats?.eft) {
-            return [];
-        }
-        const statSides = { scavStats: "Scav", pmcStats: "PMC" };
-        const statTypes = [
-            {
-                name: "raids",
-                key: ["Sessions"],
-            },
-            {
-                name: "survived",
-                key: ["ExitStatus", "Survived"],
-            },
-            {
-                name: "runthrough",
-                key: ["ExitStatus", "Runner"],
-            },
-            {
-                name: "mia",
-                key: ["ExitStatus", "Left"],
-            },
-            {
-                name: "kia",
-                key: ["ExitStatus", "Killed"],
-            },
-            {
-                name: "kills",
-                key: ["Kills"],
-            },
-            {
-                name: "streak",
-                key: ["LongestWinStreak"],
-            },
-        ];
-        const getStats = (side) => {
-            return {
-                side,
-                ...statTypes.reduce((all, s) => {
-                    all[s.name] = 0;
-                    return all;
-                }, {}),
-            };
-        };
-        const totalStats = getStats("Total");
-        const statsData = [totalStats];
-        for (const sideKey in statSides) {
-            const sideLabel = statSides[sideKey];
-            const stats = playerData[sideKey].eft.overAllCounters.Items;
-            const currentData = getStats(sideLabel);
-            for (const st of statTypes) {
-                const foundStat = stats.find((s) => !st.key.some((keyPart) => !s.Key.includes(keyPart)));
-                currentData[st.name] = foundStat?.Value || 0;
-                totalStats[st.name] += currentData[st.name];
-            }
-            statsData.push(currentData);
-        }
-        return statsData;
-    }, [playerData]);
-
-    const skillsColumns = useMemo(
-        () => [
-            {
-                Header: t("Skill"),
-                id: "skill",
-                accessor: "skill",
-                Cell: (props) => {
-                    let image = <></>;
-                    if (props.row.original.imageLink) {
-                        image = <img src={props.row.original.imageLink} alt="" className="table-image" />;
-                    }
-                    return (
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                            {image}
-                            <span>{props.value}</span>
-                        </div>
-                    );
-                },
-            },
-            {
-                Header: t("Level"),
-                id: "progress",
-                accessor: "progress",
-                Cell: (props) => {
-                    return (props.value / 100).toFixed(2);
-                },
-            },
-            {
-                Header: t("Last Access"),
-                id: "lastAccess",
-                accessor: "lastAccess",
-                Cell: (props) => {
-                    return new Date(props.value * 1000).toLocaleString();
-                },
-            },
-        ],
-        [t],
-    );
-
-    const skillsData = useMemo(() => {
-        return (
-            playerData.skills?.Common?.map((s) => {
-                if (!s.Progress || s.LastAccess <= 0) {
-                    return false;
-                }
-                const skill = handbook.skills.find((skill) => skill.id === s.Id);
-                if (!skill) {
-                    return false;
-                }
-                return {
-                    skill: skill?.name || s.Id,
-                    id: s.Id,
-                    imageLink: skill.imageLink,
-                    progress: s.Progress,
-                    lastAccess: s.LastAccess,
-                };
-            }).filter(Boolean) || []
-        );
-    }, [playerData, handbook]);
-
-    const masteringColumns = useMemo(
-        () => [
-            {
-                id: "expander",
-                Header: ({ getToggleAllRowsExpandedProps, isAllRowsExpanded }) =>
-                    // <span {...getToggleAllRowsExpandedProps()}>
-                    //     {isAllRowsExpanded ? 'v' : '>'}
-                    // </span>
-                    null,
-                Cell: ({ row }) =>
-                    // Use the row.canExpand and row.getToggleRowExpandedProps prop getter
-                    // to build the toggle for expanding a row
-                    row.canExpand ? (
-                        <span
-                            {...row.getToggleRowExpandedProps({
-                                style: {
-                                    // We can even use the row.depth property
-                                    // and paddingLeft to indicate the depth
-                                    // of the row
-                                    // paddingLeft: `${row.depth * 2}rem`,
-                                },
-                            })}
-                        >
-                            <ArrowIcon direction={row.isExpanded ? "down" : "right"} />
-                        </span>
-                    ) : null,
-            },
-            {
-                Header: t("Weapon"),
-                id: "name",
-                accessor: "name",
-                Cell: (props) => {
-                    if (props.row.original.shortName) {
-                        return <ItemNameCell item={props.row.original} items={items} />;
-                    }
-                    return props.value;
-                },
-            },
-            {
-                Header: t("Progress"),
-                id: "Progress",
-                accessor: "Progress",
-                Cell: (props) => {
-                    if (props.row.original.shortName) {
-                        return "";
-                    }
-                    return props.value + ` (${props.row.original.level})`;
-                },
-                sortType: (a, b) => {
-                    const aValue = a.original;
-                    const bValue = b.original;
-                    const diff = aValue.level - bValue.level;
-                    if (diff !== 0) {
-                        return diff;
-                    }
-                    return aValue.Progress - bValue.Progress;
-                },
-            },
-        ],
-        [t, items],
-    );
-
-    const masteringData = useMemo(() => {
-        return (
-            playerData.skills?.Mastering?.map((masteringProgress) => {
-                const mastering = handbook.mastering.find((m) => m.id === String(masteringProgress.Id));
-                if (!mastering) {
-                    return false;
-                }
-                let level = 1;
-                if (masteringProgress.Progress > mastering.level3) {
-                    level = 3;
-                } else if (masteringProgress.Progress > mastering.level2) {
-                    level = 2;
-                }
-                return {
-                    ...masteringProgress,
-                    name: masteringProgress.Id,
-                    level,
-                    subRows: mastering.weapons
-                        .map((w) => {
-                            const baseItem = items.find((i) => i.id === w.id);
-                            if (!baseItem) {
-                                return false;
-                            }
-                            const preset = items.find((i) => i.id === baseItem.properties.defaultPreset?.id);
-                            return {
-                                ...baseItem,
-                                itemLink: `/item/${baseItem.normalizedName}`,
-                                iconLink: preset ? preset.iconLink : baseItem.iconLink,
-                                Progress: masteringProgress.Progress,
-                                level,
-                            };
-                        })
-                        .filter(Boolean),
-                };
-            }).filter(Boolean) || []
-        );
-    }, [playerData, handbook, items]);
 
     const totalTimeInGame = useMemo(() => {
         const totalSecondsInGame = playerData.pmcStats?.eft?.totalInGameTime || 0;
@@ -1345,69 +965,483 @@ function Player() {
                     </>
                 )}
                 {favoriteItemsContent}
-                {raidsData?.length > 0 && (
-                    <>
-                        <h2 key="raids-title">
-                            <Icon path={mdiChartLine} size={1.5} className="icon-with-text" />
-                            {t("Raid Stats")}
-                        </h2>
-                        <DataTable
-                            key="raids-table"
-                            columns={raidsColumns}
-                            data={raidsData}
-                            headConfig={raidsTableHeadConfig}
-                        />
-                    </>
-                )}
-                {achievementsData?.length > 0 && (
-                    <>
-                        <h2 key="achievements-title">
-                            <Icon path={mdiTrophy} size={1.5} className="icon-with-text" />
-                            {t("Achievements")}
-                        </h2>
-                        <DataTable
-                            key="achievements-table"
-                            columns={achievementColumns}
-                            data={achievementsData}
-                            sortBy="completionDate"
-                            headConfig={achievementTableHeadConfig}
-                        />
-                    </>
-                )}
-                {skillsData?.length > 0 && (
-                    <>
-                        <h2 key="skills-title">
-                            <Icon path={mdiArmFlex} size={1.5} className="icon-with-text" />
-                            {t("Skills")}
-                        </h2>
-                        <DataTable
-                            key="skills-table"
-                            columns={skillsColumns}
-                            data={skillsData}
-                            sortBy="skill"
-                            headConfig={skillsTableHeadConfig}
-                        />
-                    </>
-                )}
-                {masteringData?.length > 0 && (
-                    <>
-                        <h2 key="mastering-title">
-                            <Icon path={mdiStarBox} size={1.5} className="icon-with-text" />
-                            {t("Mastering")}
-                        </h2>
-                        <DataTable
-                            key="skills-table"
-                            columns={masteringColumns}
-                            data={masteringData}
-                            sortBy="Progress"
-                            sortByDesc={true}
-                            headConfig={masteringTableHeadConfig}
-                        />
-                    </>
-                )}
+                <RaidDataTable playerData={playerData} />
+                <AchievementsDataTable playerData={playerData} achievements={achievements} />
+                <SkillsDataTable playerData={playerData} handbook={handbook} />
+                <MasteringDataTable playerData={playerData} handbook={handbook} items={items} />
             </div>
         </div>,
     ];
+}
+
+function RaidDataTable({ playerData }) {
+    const { t } = useTranslation();
+
+    const raidsColumns = useMemo(
+        () => [
+            {
+                Header: t("Side"),
+                id: "side",
+                accessor: "side",
+                Cell: (props) => {
+                    return t(props.value);
+                },
+            },
+            {
+                Header: t("Raids"),
+                id: "raids",
+                accessor: "raids",
+            },
+            {
+                Header: t("Survived"),
+                id: "survived",
+                accessor: "survived",
+            },
+            {
+                Header: t("Runthrough"),
+                id: "runthrough",
+                accessor: "runthrough",
+                Cell: (props) => {
+                    return props.value;
+                },
+            },
+            {
+                Header: t("MIA"),
+                id: "mia",
+                accessor: "mia",
+                Cell: (props) => {
+                    return props.value;
+                },
+            },
+            {
+                Header: t("KIA"),
+                id: "kia",
+                accessor: "kia",
+                Cell: (props) => {
+                    return props.value;
+                },
+            },
+            {
+                Header: t("Kills"),
+                id: "kills",
+                accessor: "kills",
+                Cell: (props) => {
+                    return props.value;
+                },
+            },
+            {
+                Header: t("K:D", { nsSeparator: "|" }),
+                id: "kdr",
+                accessor: "kills",
+                Cell: (props) => {
+                    if (props.value === 0) {
+                        return "0";
+                    }
+                    return (props.value / props.row.original.kia).toFixed(2);
+                },
+            },
+            {
+                Header: t("Win Streak"),
+                id: "streak",
+                accessor: "streak",
+                Cell: (props) => {
+                    return props.value;
+                },
+            },
+        ],
+        [t],
+    );
+
+    const raidsData = useMemo(() => {
+        if (!playerData.pmcStats?.eft) {
+            return [];
+        }
+        const statSides = { scavStats: "Scav", pmcStats: "PMC" };
+        const statTypes = [
+            {
+                name: "raids",
+                key: ["Sessions"],
+            },
+            {
+                name: "survived",
+                key: ["ExitStatus", "Survived"],
+            },
+            {
+                name: "runthrough",
+                key: ["ExitStatus", "Runner"],
+            },
+            {
+                name: "mia",
+                key: ["ExitStatus", "Left"],
+            },
+            {
+                name: "kia",
+                key: ["ExitStatus", "Killed"],
+            },
+            {
+                name: "kills",
+                key: ["Kills"],
+            },
+            {
+                name: "streak",
+                key: ["LongestWinStreak"],
+            },
+        ];
+        const getStats = (side) => {
+            return {
+                side,
+                ...statTypes.reduce((all, s) => {
+                    all[s.name] = 0;
+                    return all;
+                }, {}),
+            };
+        };
+        const totalStats = getStats("Total");
+        const statsData = [totalStats];
+        for (const sideKey in statSides) {
+            const sideLabel = statSides[sideKey];
+            const stats = playerData[sideKey].eft.overAllCounters.Items;
+            const currentData = getStats(sideLabel);
+            for (const st of statTypes) {
+                const foundStat = stats.find((s) => !st.key.some((keyPart) => !s.Key.includes(keyPart)));
+                currentData[st.name] = foundStat?.Value || 0;
+                totalStats[st.name] += currentData[st.name];
+            }
+            statsData.push(currentData);
+        }
+        return statsData;
+    }, [playerData]);
+
+    if (raidsData?.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            <h2 key="raids-title">
+                <Icon path={mdiChartLine} size={1.5} className="icon-with-text" />
+                {t("Raid Stats")}
+            </h2>
+            <DataTable key="raids-table" columns={raidsColumns} data={raidsData} headConfig={raidsTableHeadConfig} />
+        </>
+    );
+}
+
+function AchievementsDataTable({ playerData, achievements }) {
+    const { t } = useTranslation();
+    const currentWipe = wipeDetails()[0];
+
+    const achievementColumns = useMemo(
+        () => [
+            {
+                Header: t("Name"),
+                id: "name",
+                accessor: "name",
+                Cell: (props) => {
+                    let image = <></>;
+                    if (props.row.original.imageLink) {
+                        image = <img src={props.row.original.imageLink} alt="" className="table-image" />;
+                    }
+                    return (
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                            {image}
+                            <span>{props.value}</span>
+                        </div>
+                    );
+                },
+            },
+            {
+                Header: t("Description"),
+                id: "description",
+                accessor: "description",
+            },
+            {
+                Header: t("Player %"),
+                id: "playersCompletedPercent",
+                accessor: "adjustedPlayersCompletedPercent",
+                Cell: (props) => {
+                    return <div className="center-content">{props.value}%</div>;
+                },
+                sortType: "basic",
+            },
+            {
+                Header: t("Completed"),
+                id: "completionDate",
+                accessor: "completionDate",
+                Cell: (props) => {
+                    return (
+                        <div
+                            className={`center-content${new Date(props.value * 1000) > currentWipe.start ? " current-wipe-achievement" : ""}`}
+                        >
+                            {new Date(props.value * 1000).toLocaleString()}
+                        </div>
+                    );
+                },
+            },
+            {
+                Header: t("Rarity"),
+                id: "rarity",
+                accessor: "rarity",
+                Cell: (props) => {
+                    return <div className={`center-content ${props.row.original.normalizedRarity}`}>{props.value}</div>;
+                },
+                sortType: (rowA, rowB) => {
+                    let rowAr = raritySort[rowA.original.normalizedRarity];
+                    let rowBr = raritySort[rowB.original.normalizedRarity];
+                    if (rowAr === rowBr) {
+                        return rowB.original.playersCompletedPercent - rowA.original.playersCompletedPercent;
+                    }
+                    return rowAr - rowBr;
+                },
+            },
+        ],
+        [t, currentWipe],
+    );
+
+    const achievementsData = useMemo(() => {
+        return (
+            achievements
+                ?.map((a) => {
+                    if (!playerData.achievements[a.id]) {
+                        return false;
+                    }
+                    return {
+                        ...a,
+                        completionDate: playerData.achievements[a.id],
+                    };
+                })
+                .filter(Boolean) || []
+        );
+    }, [achievements, playerData]);
+
+    if (achievementsData?.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            <h2 key="achievements-title">
+                <Icon path={mdiTrophy} size={1.5} className="icon-with-text" />
+                {t("Achievements")}
+            </h2>
+            <DataTable
+                key="achievements-table"
+                columns={achievementColumns}
+                data={achievementsData}
+                sortBy="completionDate"
+                headConfig={achievementTableHeadConfig}
+            />
+        </>
+    );
+}
+
+function SkillsDataTable({ playerData, handbook }) {
+    const { t } = useTranslation();
+
+    const skillsColumns = useMemo(
+        () => [
+            {
+                Header: t("Skill"),
+                id: "skill",
+                accessor: "skill",
+                Cell: (props) => {
+                    let image = <></>;
+                    if (props.row.original.imageLink) {
+                        image = <img src={props.row.original.imageLink} alt="" className="table-image" />;
+                    }
+                    return (
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                            {image}
+                            <span>{props.value}</span>
+                        </div>
+                    );
+                },
+            },
+            {
+                Header: t("Level"),
+                id: "progress",
+                accessor: "progress",
+                Cell: (props) => {
+                    return (props.value / 100).toFixed(2);
+                },
+            },
+            {
+                Header: t("Last Access"),
+                id: "lastAccess",
+                accessor: "lastAccess",
+                Cell: (props) => {
+                    return new Date(props.value * 1000).toLocaleString();
+                },
+            },
+        ],
+        [t],
+    );
+
+    const skillsData = useMemo(() => {
+        return (
+            playerData.skills?.Common?.map((s) => {
+                if (!s.Progress || s.LastAccess <= 0) {
+                    return false;
+                }
+                const skill = handbook.skills.find((skill) => skill.id === s.Id);
+                if (!skill) {
+                    return false;
+                }
+                return {
+                    skill: skill?.name || s.Id,
+                    id: s.Id,
+                    imageLink: skill.imageLink,
+                    progress: s.Progress,
+                    lastAccess: s.LastAccess,
+                };
+            }).filter(Boolean) || []
+        );
+    }, [playerData, handbook]);
+
+    if (skillsData?.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            <h2 key="skills-title">
+                <Icon path={mdiArmFlex} size={1.5} className="icon-with-text" />
+                {t("Skills")}
+            </h2>
+            <DataTable
+                key="skills-table"
+                columns={skillsColumns}
+                data={skillsData}
+                sortBy="skill"
+                headConfig={skillsTableHeadConfig}
+            />
+        </>
+    );
+}
+
+function MasteringDataTable({ playerData, handbook, items }) {
+    const { t } = useTranslation();
+
+    const masteringColumns = useMemo(
+        () => [
+            {
+                id: "expander",
+                Header: ({ getToggleAllRowsExpandedProps, isAllRowsExpanded }) =>
+                    // <span {...getToggleAllRowsExpandedProps()}>
+                    //     {isAllRowsExpanded ? 'v' : '>'}
+                    // </span>
+                    null,
+                Cell: ({ row }) =>
+                    // Use the row.canExpand and row.getToggleRowExpandedProps prop getter
+                    // to build the toggle for expanding a row
+                    row.canExpand ? (
+                        <span
+                            {...row.getToggleRowExpandedProps({
+                                style: {
+                                    // We can even use the row.depth property
+                                    // and paddingLeft to indicate the depth
+                                    // of the row
+                                    // paddingLeft: `${row.depth * 2}rem`,
+                                },
+                            })}
+                        >
+                            {row.isExpanded ? <ArrowIcon /> : <ArrowIcon className={"arrow-right"} />}
+                        </span>
+                    ) : null,
+            },
+            {
+                Header: t("Weapon"),
+                id: "name",
+                accessor: "name",
+                Cell: (props) => {
+                    if (props.row.original.shortName) {
+                        return <ItemNameCell item={props.row.original} items={items} />;
+                    }
+                    return props.value;
+                },
+            },
+            {
+                Header: t("Progress"),
+                id: "Progress",
+                accessor: "Progress",
+                Cell: (props) => {
+                    if (props.row.original.shortName) {
+                        return "";
+                    }
+                    return props.value + ` (${props.row.original.level})`;
+                },
+                sortType: (a, b) => {
+                    const aValue = a.original;
+                    const bValue = b.original;
+                    const diff = aValue.level - bValue.level;
+                    if (diff !== 0) {
+                        return diff;
+                    }
+                    return aValue.Progress - bValue.Progress;
+                },
+            },
+        ],
+        [t, items],
+    );
+
+    const masteringData = useMemo(() => {
+        return (
+            playerData.skills?.Mastering?.map((masteringProgress) => {
+                const mastering = handbook.mastering.find((m) => m.id === String(masteringProgress.Id));
+                if (!mastering) {
+                    return false;
+                }
+                let level = 1;
+                if (masteringProgress.Progress > mastering.level3) {
+                    level = 3;
+                } else if (masteringProgress.Progress > mastering.level2) {
+                    level = 2;
+                }
+                return {
+                    ...masteringProgress,
+                    name: masteringProgress.Id,
+                    level,
+                    subRows: mastering.weapons
+                        .map((w) => {
+                            const baseItem = items.find((i) => i.id === w.id);
+                            if (!baseItem) {
+                                return false;
+                            }
+                            const preset = items.find((i) => i.id === baseItem.properties.defaultPreset?.id);
+                            return {
+                                ...baseItem,
+                                itemLink: `/item/${baseItem.normalizedName}`,
+                                iconLink: preset ? preset.iconLink : baseItem.iconLink,
+                                Progress: masteringProgress.Progress,
+                                level,
+                            };
+                        })
+                        .filter(Boolean),
+                };
+            }).filter(Boolean) || []
+        );
+    }, [playerData, handbook, items]);
+
+    if (masteringData?.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            <h2 key="mastering-title">
+                <Icon path={mdiStarBox} size={1.5} className="icon-with-text" />
+                {t("Mastering")}
+            </h2>
+            <DataTable
+                key="mastering-table"
+                columns={masteringColumns}
+                data={masteringData}
+                sortBy="Progress"
+                sortByDesc={true}
+                headConfig={masteringTableHeadConfig}
+            />
+        </>
+    );
 }
 
 export default Player;
